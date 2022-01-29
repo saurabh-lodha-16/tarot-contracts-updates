@@ -287,6 +287,16 @@ contract SupplyVault is ERC20, ISupplyVault, Ownable, Pausable, ReentrancyGuard 
         }
     }
 
+    function _readGetTotalUnderlying() private view returns (uint256 totalUnderlying) {
+        totalUnderlying = underlying.balanceOf(address(this));
+
+        uint256 numBorrowables = borrowables.length;
+        for (uint256 i = 0; i < numBorrowables; i++) {
+            IBorrowable borrowable = borrowables[i];
+            totalUnderlying = totalUnderlying.add(borrowable.readMyUnderlyingBalance());
+        }
+    }
+
     function enter(uint256 _amount)
         external
         override
@@ -546,6 +556,19 @@ contract SupplyVault is ERC20, ISupplyVault, Ownable, Pausable, ReentrancyGuard 
     }
 
     // returns the total amount of underlying an address has in the supply vault
+    function readUnderlyingBalanceForAccount(address _account)
+        external
+        view
+        override
+        returns (uint256 underlyingBalance)
+    {
+        (uint256 totalUnderlying, uint256 feeShares) = _applyFeeReadOp();
+        uint256 shareAmount = balanceOf(_account);
+        uint256 totalSharesAfterFees = totalSupply().add(feeShares);
+        underlyingBalance = shareAmount.mul(totalUnderlying).div(totalSharesAfterFees);
+    }
+
+    // returns the total amount of underlying an address has in the supply vault
     function underlyingBalanceForAccount(address _account)
         external
         override
@@ -559,6 +582,18 @@ contract SupplyVault is ERC20, ISupplyVault, Ownable, Pausable, ReentrancyGuard 
     }
 
     // Returns how much underlying we get for a given amount of share
+    function readShareValuedAsUnderlying(uint256 _share)
+        external
+        view
+        override
+        returns (uint256 underlyingAmount_)
+    {
+        (uint256 totalUnderlying, uint256 feeShares) = _applyFeeReadOp();
+        uint256 totalSharesAfterFees = totalSupply().add(feeShares);
+        underlyingAmount_ = _share.mul(totalUnderlying).div(totalSharesAfterFees);
+    }
+
+    // Returns how much underlying we get for a given amount of share
     function shareValuedAsUnderlying(uint256 _share)
         external
         override
@@ -568,6 +603,35 @@ contract SupplyVault is ERC20, ISupplyVault, Ownable, Pausable, ReentrancyGuard 
         uint256 totalUnderlying = _applyFee();
         uint256 totalShares = totalSupply();
         underlyingAmount_ = _share.mul(totalUnderlying).div(totalShares);
+    }
+
+    // Returns how much share we get for depositing a given amount of underlying
+    function readUnderlyingValuedAsShare(uint256 _underlyingAmount)
+        external
+        view
+        override
+        returns (uint256 share_)
+    {
+        (uint256 totalUnderlying, uint256 feeShares) = _applyFeeReadOp();
+        uint256 totalSharesAfterFees = totalSupply().add(feeShares);
+
+        if (totalSharesAfterFees == 0) {
+            if (totalUnderlying == 0) {
+                // If no shares exists, mint it 1:1 to the amount put in
+                share_ = _underlyingAmount;
+            } else {
+                // No shares but we have a non-zero balance of underlying so mint 1:1 including existing balance
+                share_ = _underlyingAmount.add(totalUnderlying);
+            }
+        } else {
+            // Shares are non-zero but we have a zero balance of underlying
+            // Cannot happen because checkpoint balance would have been above zero
+            require(totalUnderlying > 0, "V:TU_ZERO");
+
+            // Calculate and mint the amount of shares the underlying is worth.
+            // The ratio will change overtime, as shares are burned/minted and underlying deposited + gained from fees / withdrawn.
+            share_ = _underlyingAmount.mul(totalSharesAfterFees).div(totalUnderlying);
+        }
     }
 
     // Returns how much share we get for depositing a given amount of underlying
@@ -642,6 +706,35 @@ contract SupplyVault is ERC20, ISupplyVault, Ownable, Pausable, ReentrancyGuard 
 
             // Update our fee collection checkpoint watermark
             _updateCheckpointBalance(totalUnderlying);
+        }
+    }
+
+    // Apply fees and return back the total underlying (Read function)
+    function _applyFeeReadOp() private view returns (uint256 totalUnderlying, uint256 feeShares) {
+        totalUnderlying = _readGetTotalUnderlying();
+
+        if (totalUnderlying > checkpointBalance) {
+            if (feeTo != address(0)) {
+                uint256 gain = totalUnderlying.sub(checkpointBalance);
+                uint256 fee = gain.mul(feeBps).div(MAX_BPS); // fee < gain
+                // gain >= fee * MAX_BPS / feeBps
+                // totalBalance - gain >= 0
+                // totalBalance - fee > 0
+
+                // (gain * Fee%) * Supply / (U - (gain * Fee%))
+                if (fee > 0) {
+                    uint256 totalShares = totalSupply();
+                    // X = F * S / (U - F)
+                    feeShares = fee.mul(totalShares).div(totalUnderlying.sub(fee));
+                    // if (feeShares > 0) {
+                    // mint(feeTo, feeShares);
+                    // emit ApplyFee(feeTo, gain, fee, feeShares);
+                    // }
+                }
+            }
+
+            // Update our fee collection checkpoint watermark
+            // _updateCheckpointBalance(totalUnderlying);
         }
     }
 
