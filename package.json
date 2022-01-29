@@ -1,10 +1,33 @@
 {
+  "name": "tarot-contracts-updates",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/saurabh-lodha-16/tarot-contracts-updates",
+  "description": "This is my attempt to add some read functions and contribute to the amazing contracts written by the Tarot team.",
+  "author": "saurabh-lodha-16 <saurabhlodha221b@gmail.com>",
+  "scripts": {
+    "lint": "./node_modules/.bin/solhint contracts/**/*.sol",
+    "compile": "npx hardhat compile",
+    "test": "hardhat test",
+    "format": "./node_modules/.bin/prettier --write contracts/**/*.sol"
+  },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@nomiclabs/hardhat-waffle": "^2.0.0",
     "chai": "^4.2.0",
     "ethereum-waffle": "^3.0.0",
     "ethers": "^5.0.0",
-    "hardhat": "^2.8.3"
+    "hardhat": "^2.8.3",
+    "@nomiclabs/hardhat-etherscan": "^2.1.6",
+    "@openzeppelin/hardhat-upgrades": "^1.6.0",
+    "prettier": "^2.4.0",
+    "prettier-plugin-solidity": "^1.0.0-beta.18",
+    "solhint": "^3.3.6",
+    "solhint-plugin-prettier": "^0.0.5"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^3.4.0",
+    "chai-as-promised": "^7.1.1",
+    "dotenv": "^10.0.0"
   }
 }
