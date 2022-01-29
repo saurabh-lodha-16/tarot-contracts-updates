@@ -30,6 +30,18 @@ library BorrowableHelpers {
         return borrowableAmount.mul(exchangeRate).div(1e18);
     }
 
+    function readUnderlyingValueOf(IBorrowable borrowable, uint256 borrowableAmount)
+        internal
+        view
+        returns (uint256)
+    {
+        if (borrowableAmount == 0) {
+            return 0;
+        }
+        uint256 exchangeRate = borrowable.readExchangeRate();
+        return borrowableAmount.mul(exchangeRate).div(1e18);
+    }
+
     function underlyingBalanceOf(IBorrowable borrowable, address account)
         internal
         returns (uint256)
@@ -39,6 +51,11 @@ library BorrowableHelpers {
 
     function myUnderlyingBalance(IBorrowable borrowable) internal returns (uint256) {
         return underlyingValueOf(borrowable, borrowable.balanceOf(address(this)));
+    }
+
+    function readMyUnderlyingBalance(IBorrowable borrowable) internal view returns (uint256) {
+        //Ask here if reserve minting have any implication to this part of logic
+        return readUnderlyingValueOf(borrowable, borrowable.balanceOf(address(this)));
     }
 
     function getNextBorrowRate(

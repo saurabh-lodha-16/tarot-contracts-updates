@@ -45,12 +45,27 @@ interface ISupplyVault {
 
     function reallocateManager() external view returns (address);
 
+    function readUnderlyingBalanceForAccount(address _account)
+        external
+        view
+        returns (uint256 underlyingBalance);
+
     /* Read functions that are non-view due to updating exchange rates */
     function underlyingBalanceForAccount(address _account)
         external
         returns (uint256 underlyingBalance);
 
+    function readShareValuedAsUnderlying(uint256 _share)
+        external
+        view
+        returns (uint256 underlyingAmount_);
+
     function shareValuedAsUnderlying(uint256 _share) external returns (uint256 underlyingAmount_);
+
+    function readUnderlyingValuedAsShare(uint256 _underlyingAmount)
+        external
+        view
+        returns (uint256 share_);
 
     function underlyingValuedAsShare(uint256 _underlyingAmount) external returns (uint256 share_);
 
