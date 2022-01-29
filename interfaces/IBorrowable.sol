@@ -71,6 +71,8 @@ interface IBorrowable {
 
     function exchangeRate() external returns (uint256);
 
+    function readExchangeRate() external view returns (uint256);
+
     function mint(address minter) external returns (uint256 mintTokens);
 
     function redeem(address redeemer) external returns (uint256 redeemAmount);

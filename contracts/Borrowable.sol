@@ -773,6 +773,26 @@ contract BInterestRateModel is PoolToken, BStorage {
         emit AccrueInterest(interestAccumulated, _borrowIndex, _totalBorrows);
     }
 
+    function readAccrueInterest()
+        public
+        view
+        returns (uint256 _borrowIndex, uint256 _totalBorrows)
+    {
+        _borrowIndex = borrowIndex;
+        _totalBorrows = totalBorrows;
+        uint32 _accrualTimestamp = accrualTimestamp;
+
+        uint32 blockTimestamp = getBlockTimestamp();
+        if (_accrualTimestamp == blockTimestamp) return (borrowIndex, totalBorrows);
+        uint32 timeElapsed = blockTimestamp - _accrualTimestamp; // underflow is desired
+        // accrualTimestamp = blockTimestamp;
+
+        uint256 interestFactor = uint256(borrowRate).mul(timeElapsed);
+        uint256 interestAccumulated = interestFactor.mul(_totalBorrows).div(1e18);
+        _totalBorrows = _totalBorrows.add(interestAccumulated);
+        _borrowIndex = _borrowIndex.add(interestFactor.mul(_borrowIndex).div(1e18));
+    }
+
     function getBlockTimestamp() public view returns (uint32) {
         return uint32(block.timestamp % 2**32);
     }
@@ -1393,12 +1413,44 @@ contract Borrowable is IBorrowable, PoolToken, BStorage, BSetter, BInterestRateM
         } else return _exchangeRate;
     }
 
+    function _readMintReserves(uint256 _exchangeRate, uint256 _totalSupply)
+        internal
+        view
+        returns (uint256)
+    {
+        uint256 _exchangeRateLast = exchangeRateLast;
+        if (_exchangeRate > _exchangeRateLast) {
+            uint256 _exchangeRateNew = _exchangeRate.sub(
+                _exchangeRate.sub(_exchangeRateLast).mul(reserveFactor).div(1e18)
+            );
+            uint256 liquidity = _totalSupply.mul(_exchangeRate).div(_exchangeRateNew).sub(
+                _totalSupply
+            );
+            if (liquidity == 0) return _exchangeRate;
+            address reservesManager = IFactory(factory).reservesManager();
+            // _mint(reservesManager, liquidity);
+            // exchangeRateLast = _exchangeRateNew;
+            return _exchangeRateNew;
+        } else return _exchangeRate;
+    }
+
     function exchangeRate() public accrue returns (uint256) {
         uint256 _totalSupply = totalSupply;
         uint256 _actualBalance = totalBalance.add(totalBorrows);
         if (_totalSupply == 0 || _actualBalance == 0) return initialExchangeRate;
         uint256 _exchangeRate = _actualBalance.mul(1e18).div(_totalSupply);
         return _mintReserves(_exchangeRate, _totalSupply);
+    }
+
+    function readExchangeRate() public view returns (uint256) {
+        //stuff used in modifier accrue interest
+        (uint256 borrowIndex, uint256 totalBorrows) = readAccrueInterest();
+
+        uint256 _totalSupply = totalSupply;
+        uint256 _actualBalance = totalBalance.add(totalBorrows);
+        if (_totalSupply == 0 || _actualBalance == 0) return initialExchangeRate;
+        uint256 _exchangeRate = _actualBalance.mul(1e18).div(_totalSupply);
+        return _readMintReserves(_exchangeRate, _totalSupply);
     }
 
     // force totalBalance to match real balance
